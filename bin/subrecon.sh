@@ -23,6 +23,7 @@ ASSETFINDER_OUT="$OUTDIR/${DOMAIN}ass.txt"
 SUBFINDER_OUT="$OUTDIR/${DOMAIN}sub.txt"
 FINDOMAIN_OUT="$OUTDIR/${DOMAIN}dom.txt"
 FINAL_OUT="$OUTDIR/${DOMAIN}fin.txt"
+TAKEOVER_OUT="$OUTDIR/${DOMAIN}tko.txt"
 LOG_FILE="$OUTDIR/run_$TIMESTAMP.log"
 
 echo "[*] Target domain : $DOMAIN"
@@ -40,7 +41,7 @@ check_tool() {
 }
 
 MISSING=0
-for tool in assetfinder subfinder findomain; do
+for tool in assetfinder subfinder findomain subzy; do
     check_tool "$tool" || MISSING=1
 done
 
@@ -71,3 +72,9 @@ cat "$ASSETFINDER_OUT" "$SUBFINDER_OUT" "$FINDOMAIN_OUT" 2>/dev/null | sort -u >
 TOTAL=$(wc -l < "$FINAL_OUT")
 echo
 echo "[+] Done. $TOTAL unique subdomains saved to $FINAL_OUT"
+
+# ---- Run subzy (subdomain takeover check) ----
+echo
+echo "[*] Running subzy against merged subdomain list..." | tee -a "$LOG_FILE"
+subzy run --targets "$FINAL_OUT" --hide_fails > "$TAKEOVER_OUT" 2>>"$LOG_FILE" || echo "[!] subzy exited with an error" | tee -a "$LOG_FILE"
+echo "[+] subzy results saved to $TAKEOVER_OUT"

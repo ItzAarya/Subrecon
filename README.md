@@ -13,7 +13,7 @@ Make sure these tools are installed and available in your `PATH`:
 - [assetfinder](https://github.com/tomnomnom/assetfinder)
 - [subfinder](https://github.com/projectdiscovery/subfinder)
 - [findomain](https://github.com/findomain/findomain)
-- [subzy](https://github.com/PentestPad/subzy) (subdomain takeover check)
+- [nuclei](https://github.com/projectdiscovery/nuclei) (subdomain takeover check, using the `takeover` template tag — run `nuclei -update-templates` once before first use)
 
 ## Install
 
@@ -58,7 +58,7 @@ directory, containing:
 | `example.comsub.txt`   | subfinder results                  |
 | `example.comdom.txt`   | findomain results                  |
 | `example.comfin.txt`   | final merged, deduped subdomain list |
-| `example.comtko.txt`   | subzy subdomain takeover check results |
+| `example.comtko.txt`   | nuclei subdomain takeover check results |
 | `run_<timestamp>.log`  | run log / errors                   |
 
 Pass a second argument to control where the domain folder is created:

@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# install.sh - Installs subrecon.sh into ~/bin and ensures it's on PATH.
+# install.sh - Installs required recon tools (if missing), then installs
+# subrecon.sh into ~/bin and ensures it's on PATH.
 #
 # Usage: ./install.sh
 
@@ -15,6 +16,96 @@ if [ ! -f "$SRC" ]; then
     echo "[!] Could not find $SRC. Run this script from inside the cloned repo."
     exit 1
 fi
+
+# ---- Install dependencies ----
+# Most of these are packaged in Kali's apt repos; assetfinder generally is not,
+# so it falls back to 'go install' if apt doesn't have it and Go is available.
+install_apt() {
+    local pkg="$1"
+    echo "[*] Installing $pkg via apt..."
+    sudo apt-get install -y "$pkg"
+}
+
+install_go() {
+    local name="$1" import_path="$2"
+    if ! command -v go &>/dev/null; then
+        echo "[!] Go is not installed, cannot install $name via 'go install'."
+        echo "    Install Go first (sudo apt-get install -y golang-go), then re-run this script."
+        return 1
+    fi
+    echo "[*] Installing $name via 'go install'..."
+    go install "$import_path@latest"
+    # Make sure $GOPATH/bin (or default ~/go/bin) is on PATH for later steps
+    GOBIN_DIR="$(go env GOPATH 2>/dev/null)/bin"
+    export PATH="$GOBIN_DIR:$PATH"
+}
+
+NEED_APT_UPDATE=1
+ensure_apt_updated() {
+    if [ "$NEED_APT_UPDATE" -eq 1 ]; then
+        echo "[*] Running apt-get update..."
+        sudo apt-get update
+        NEED_APT_UPDATE=0
+    fi
+}
+
+echo "[*] Checking dependencies: assetfinder, subfinder, findomain, amass, nuclei"
+echo
+
+if ! command -v assetfinder &>/dev/null; then
+    install_go "assetfinder" "github.com/tomnomnom/assetfinder" || true
+else
+    echo "[+] assetfinder already installed."
+fi
+
+if ! command -v subfinder &>/dev/null; then
+    ensure_apt_updated
+    install_apt subfinder || install_go "subfinder" "github.com/projectdiscovery/subfinder/v2/cmd/subfinder" || true
+else
+    echo "[+] subfinder already installed."
+fi
+
+if ! command -v findomain &>/dev/null; then
+    ensure_apt_updated
+    install_apt findomain || true
+else
+    echo "[+] findomain already installed."
+fi
+
+if ! command -v amass &>/dev/null; then
+    ensure_apt_updated
+    install_apt amass || true
+else
+    echo "[+] amass already installed."
+fi
+
+if ! command -v nuclei &>/dev/null; then
+    ensure_apt_updated
+    install_apt nuclei || install_go "nuclei" "github.com/projectdiscovery/nuclei/v3/cmd/nuclei" || true
+else
+    echo "[+] nuclei already installed."
+fi
+
+echo
+echo "[*] Updating nuclei templates (safe to re-run anytime)..."
+if command -v nuclei &>/dev/null; then
+    nuclei -update-templates || echo "[!] Could not update nuclei templates, continuing anyway."
+else
+    echo "[!] nuclei not found, skipping template update."
+fi
+
+echo
+MISSING_DEPS=0
+for tool in assetfinder subfinder findomain amass nuclei; do
+    if ! command -v "$tool" &>/dev/null; then
+        echo "[!] $tool is still not installed. You'll need to install it manually before running subrecon.sh."
+        MISSING_DEPS=1
+    fi
+done
+if [ "$MISSING_DEPS" -eq 0 ]; then
+    echo "[+] All dependencies are installed."
+fi
+echo
 
 mkdir -p "$TARGET_DIR"
 cp "$SRC" "$TARGET"

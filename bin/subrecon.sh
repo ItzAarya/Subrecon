@@ -1,7 +1,9 @@
 #!/bin/bash
 #
-# subrecon.sh - Run assetfinder, subfinder, and findomain against a domain,
-# save each tool's output separately, then merge + dedupe into one file.
+# subrecon.sh - Run assetfinder, subfinder, findomain, and amass against a domain,
+# save each tool's output separately, merge + dedupe into one file, then run
+# nuclei against the merged list: once for subdomain takeovers, once for
+# general exposures/misconfigs/CVEs.
 #
 # Usage: subrecon.sh domain.com [output_dir]
 
@@ -22,8 +24,10 @@ mkdir -p "$OUTDIR"
 ASSETFINDER_OUT="$OUTDIR/${DOMAIN}ass.txt"
 SUBFINDER_OUT="$OUTDIR/${DOMAIN}sub.txt"
 FINDOMAIN_OUT="$OUTDIR/${DOMAIN}dom.txt"
+AMASS_OUT="$OUTDIR/${DOMAIN}ama.txt"
 FINAL_OUT="$OUTDIR/${DOMAIN}fin.txt"
 TAKEOVER_OUT="$OUTDIR/${DOMAIN}tko.txt"
+VULN_OUT="$OUTDIR/${DOMAIN}vuln.txt"
 LOG_FILE="$OUTDIR/run_$TIMESTAMP.log"
 
 echo "[*] Target domain : $DOMAIN"
@@ -41,7 +45,7 @@ check_tool() {
 }
 
 MISSING=0
-for tool in assetfinder subfinder findomain subzy; do
+for tool in assetfinder subfinder findomain amass nuclei; do
     check_tool "$tool" || MISSING=1
 done
 
@@ -65,16 +69,27 @@ echo "[*] Running findomain..." | tee -a "$LOG_FILE"
 findomain -t "$DOMAIN" -u "$FINDOMAIN_OUT" >>"$LOG_FILE" 2>&1 || echo "[!] findomain exited with an error" | tee -a "$LOG_FILE"
 echo "    -> $(wc -l < "$FINDOMAIN_OUT" 2>/dev/null || echo 0) results saved to $FINDOMAIN_OUT"
 
+# ---- Run amass ----
+echo "[*] Running amass (passive)..." | tee -a "$LOG_FILE"
+amass enum -passive -d "$DOMAIN" -o "$AMASS_OUT" >>"$LOG_FILE" 2>&1 || echo "[!] amass exited with an error" | tee -a "$LOG_FILE"
+echo "    -> $(wc -l < "$AMASS_OUT" 2>/dev/null || echo 0) results saved to $AMASS_OUT"
+
 # ---- Merge + dedupe ----
 echo "[*] Merging and deduping results..." | tee -a "$LOG_FILE"
-cat "$ASSETFINDER_OUT" "$SUBFINDER_OUT" "$FINDOMAIN_OUT" 2>/dev/null | sort -u > "$FINAL_OUT"
+cat "$ASSETFINDER_OUT" "$SUBFINDER_OUT" "$FINDOMAIN_OUT" "$AMASS_OUT" 2>/dev/null | sort -u > "$FINAL_OUT"
 
 TOTAL=$(wc -l < "$FINAL_OUT")
 echo
 echo "[+] Done. $TOTAL unique subdomains saved to $FINAL_OUT"
 
-# ---- Run subzy (subdomain takeover check) ----
+# ---- Run nuclei (subdomain takeover check) ----
 echo
-echo "[*] Running subzy against merged subdomain list..." | tee -a "$LOG_FILE"
-subzy run --targets "$FINAL_OUT" --hide_fails > "$TAKEOVER_OUT" 2>>"$LOG_FILE" || echo "[!] subzy exited with an error" | tee -a "$LOG_FILE"
-echo "[+] subzy results saved to $TAKEOVER_OUT"
+echo "[*] Running nuclei (takeover templates) against merged subdomain list..." | tee -a "$LOG_FILE"
+nuclei -l "$FINAL_OUT" -tags takeover -o "$TAKEOVER_OUT" >>"$LOG_FILE" 2>&1 || echo "[!] nuclei exited with an error" | tee -a "$LOG_FILE"
+echo "[+] nuclei takeover results saved to $TAKEOVER_OUT"
+
+# ---- Run nuclei (general exposures / misconfigs / CVEs) ----
+echo
+echo "[*] Running nuclei (general templates, not just takeover) against merged subdomain list..." | tee -a "$LOG_FILE"
+nuclei -l "$FINAL_OUT" -o "$VULN_OUT" >>"$LOG_FILE" 2>&1 || echo "[!] nuclei exited with an error" | tee -a "$LOG_FILE"
+echo "[+] nuclei general scan results saved to $VULN_OUT"

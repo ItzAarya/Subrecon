@@ -13,7 +13,10 @@ Make sure these tools are installed and available in your `PATH`:
 - [assetfinder](https://github.com/tomnomnom/assetfinder)
 - [subfinder](https://github.com/projectdiscovery/subfinder)
 - [findomain](https://github.com/findomain/findomain)
-- [nuclei](https://github.com/projectdiscovery/nuclei) (subdomain takeover check, using the `takeover` template tag — run `nuclei -update-templates` once before first use)
+- [amass](https://github.com/owasp-amass/amass) (passive enumeration)
+- [nuclei](https://github.com/projectdiscovery/nuclei) — run `nuclei -update-templates` once before first use. Used twice per run:
+  - once with `-tags takeover` for subdomain takeover checks
+  - once with no tag restriction, for general exposures/misconfigs/CVEs across all discovered subdomains
 
 ## Install
 
@@ -57,8 +60,10 @@ directory, containing:
 | `example.comass.txt`   | assetfinder results                |
 | `example.comsub.txt`   | subfinder results                  |
 | `example.comdom.txt`   | findomain results                  |
+| `example.comama.txt`   | amass (passive) results            |
 | `example.comfin.txt`   | final merged, deduped subdomain list |
 | `example.comtko.txt`   | nuclei subdomain takeover check results |
+| `example.comvuln.txt`  | nuclei general scan results (exposures, misconfigs, CVEs) |
 | `run_<timestamp>.log`  | run log / errors                   |
 
 Pass a second argument to control where the domain folder is created:

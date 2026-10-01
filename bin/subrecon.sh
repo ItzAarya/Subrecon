@@ -76,7 +76,17 @@ echo "    -> $(wc -l < "$AMASS_OUT" 2>/dev/null || echo 0) results saved to $AMA
 
 # ---- Merge + dedupe ----
 echo "[*] Merging and deduping results..." | tee -a "$LOG_FILE"
-cat "$ASSETFINDER_OUT" "$SUBFINDER_OUT" "$FINDOMAIN_OUT" "$AMASS_OUT" 2>/dev/null | sort -u > "$FINAL_OUT"
+MERGE_FILES=()
+for f in "$ASSETFINDER_OUT" "$SUBFINDER_OUT" "$FINDOMAIN_OUT" "$AMASS_OUT"; do
+    [ -s "$f" ] && MERGE_FILES+=("$f")
+done
+
+if [ "${#MERGE_FILES[@]}" -eq 0 ]; then
+    echo "[!] No tool produced any output; nothing to merge." | tee -a "$LOG_FILE"
+    touch "$FINAL_OUT"
+else
+    cat "${MERGE_FILES[@]}" | sort -u > "$FINAL_OUT"
+fi
 
 TOTAL=$(wc -l < "$FINAL_OUT")
 echo

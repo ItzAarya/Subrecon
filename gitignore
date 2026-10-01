@@ -1,6 +1,0 @@
-# Recon output (domain-named result folders)
-*.log
-run_*.log
-
-# Common patterns for scan output dirs (domain names vary, so this is best-effort)
-/output/

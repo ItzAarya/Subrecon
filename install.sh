@@ -49,7 +49,7 @@ ensure_apt_updated() {
     fi
 }
 
-echo "[*] Checking dependencies: assetfinder, subfinder, findomain, amass, nuclei"
+echo "[*] Checking dependencies: assetfinder, subfinder, findomain, amass, httpx, gowitness, subzy, nuclei"
 echo
 
 if ! command -v assetfinder &>/dev/null; then
@@ -79,6 +79,38 @@ else
     echo "[+] amass already installed."
 fi
 
+# httpx: Kali's apt package is named 'httpx-toolkit' (there's already an unrelated
+# 'httpx' package in Debian/Kali repos), and it installs a binary called
+# 'httpx-toolkit' rather than 'httpx'. We symlink it so subrecon.sh's plain
+# 'httpx' calls work either way.
+if ! command -v httpx &>/dev/null; then
+    ensure_apt_updated
+    if install_apt httpx-toolkit; then
+        if command -v httpx-toolkit &>/dev/null && ! command -v httpx &>/dev/null; then
+            mkdir -p "$TARGET_DIR"
+            ln -sf "$(command -v httpx-toolkit)" "$TARGET_DIR/httpx"
+            echo "[+] Symlinked httpx -> httpx-toolkit in $TARGET_DIR"
+        fi
+    else
+        install_go "httpx" "github.com/projectdiscovery/httpx/cmd/httpx" || true
+    fi
+else
+    echo "[+] httpx already installed."
+fi
+
+if ! command -v gowitness &>/dev/null; then
+    ensure_apt_updated
+    install_apt gowitness || install_go "gowitness" "github.com/sensepost/gowitness" || true
+else
+    echo "[+] gowitness already installed."
+fi
+
+if ! command -v subzy &>/dev/null; then
+    install_go "subzy" "github.com/PentestPad/subzy" || true
+else
+    echo "[+] subzy already installed."
+fi
+
 if ! command -v nuclei &>/dev/null; then
     ensure_apt_updated
     install_apt nuclei || install_go "nuclei" "github.com/projectdiscovery/nuclei/v3/cmd/nuclei" || true
@@ -96,9 +128,9 @@ fi
 
 echo
 MISSING_DEPS=0
-for tool in assetfinder subfinder findomain amass nuclei; do
+for tool in assetfinder subfinder findomain amass httpx gowitness subzy nuclei; do
     if ! command -v "$tool" &>/dev/null; then
-        echo "[!] $tool is still not installed. You'll need to install it manually before running subrecon.sh."
+        echo "[!] $tool is still not installed. subrecon.sh will skip that stage until it's available."
         MISSING_DEPS=1
     fi
 done
@@ -130,6 +162,17 @@ if ! echo "$PATH" | tr ':' '\n' | grep -qx "$TARGET_DIR"; then
     echo "[*] Run 'source $RC_FILE' or restart your terminal to use 'subrecon.sh' from anywhere."
 else
     echo "[+] $TARGET_DIR is already in your PATH."
+fi
+
+# Persist Go's bin directory to PATH too, in case anything was installed via 'go install'
+if command -v go &>/dev/null; then
+    GOBIN_DIR="$(go env GOPATH 2>/dev/null)/bin"
+    if [ -d "$GOBIN_DIR" ] && ! echo "$PATH" | tr ':' '\n' | grep -qx "$GOBIN_DIR"; then
+        if ! grep -qF "$GOBIN_DIR" "$RC_FILE" 2>/dev/null; then
+            echo "export PATH=\"$GOBIN_DIR:\$PATH\"" >> "$RC_FILE"
+            echo "[+] Added $GOBIN_DIR to PATH in $RC_FILE"
+        fi
+    fi
 fi
 
 echo "[+] Done. Try: subrecon.sh example.com"

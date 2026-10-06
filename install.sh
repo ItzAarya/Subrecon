@@ -118,6 +118,50 @@ else
     echo "[+] nuclei already installed."
 fi
 
+# wappalyzer CLI is an npm package, not apt/go
+if ! command -v wappalyzer &>/dev/null; then
+    if command -v npm &>/dev/null; then
+        echo "[*] Installing wappalyzer via npm..."
+        sudo npm install -g wappalyzer || echo "[!] Failed to install wappalyzer via npm." | tee -a /dev/null
+    else
+        echo "[!] npm not found, cannot install wappalyzer. Install Node.js/npm first (sudo apt-get install -y npm), then re-run this script."
+    fi
+else
+    echo "[+] wappalyzer already installed."
+fi
+
+# wpscan is a Ruby gem
+if ! command -v wpscan &>/dev/null; then
+    if command -v gem &>/dev/null; then
+        echo "[*] Installing wpscan via gem..."
+        sudo gem install wpscan || echo "[!] Failed to install wpscan via gem."
+    else
+        ensure_apt_updated
+        install_apt wpscan || echo "[!] Could not install wpscan via apt or gem. Install Ruby first (sudo apt-get install -y ruby-full), then re-run this script."
+    fi
+else
+    echo "[+] wpscan already installed."
+fi
+
+if ! command -v joomscan &>/dev/null; then
+    ensure_apt_updated
+    install_apt joomscan || echo "[!] Could not install joomscan via apt. See https://github.com/OWASP/joomscan for manual install."
+else
+    echo "[+] joomscan already installed."
+fi
+
+if ! command -v droopescan &>/dev/null; then
+    if command -v pip3 &>/dev/null; then
+        echo "[*] Installing droopescan via pip3..."
+        pip3 install --user droopescan || echo "[!] Failed to install droopescan via pip3."
+    else
+        ensure_apt_updated
+        install_apt droopescan || echo "[!] Could not install droopescan via apt or pip3."
+    fi
+else
+    echo "[+] droopescan already installed."
+fi
+
 echo
 echo "[*] Updating nuclei templates (safe to re-run anytime)..."
 if command -v nuclei &>/dev/null; then
@@ -128,7 +172,7 @@ fi
 
 echo
 MISSING_DEPS=0
-for tool in assetfinder subfinder findomain amass httpx gowitness subzy nuclei; do
+for tool in assetfinder subfinder findomain amass httpx gowitness subzy nuclei wappalyzer wpscan joomscan droopescan; do
     if ! command -v "$tool" &>/dev/null; then
         echo "[!] $tool is still not installed. subrecon.sh will skip that stage until it's available."
         MISSING_DEPS=1
